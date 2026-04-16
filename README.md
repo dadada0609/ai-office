@@ -2,6 +2,37 @@
 
 A pixel art virtual office that visualizes your AI agents working in real-time. Watch Claude Code agents spawn, sit at desks, take coffee breaks, and chat in a Slack-inspired office chat panel — all rendered in an isometric pixel art office.
 
+## Update — Dunder Mifflin mode
+
+Type `/the-office` in the chat to flip the whole office into a Scranton-branch tribute. The room, the cast, and the chatter all swap over — Michael Scott runs the place, Jim is your assistant, and Dwight guards the beet cellar.
+
+### Pretzel day, every day
+<p>
+  <img src="docs/images/dunder-mifflin-day.png" alt="Dunder Mifflin — Day" width="48%">
+  <img src="docs/images/dunder-mifflin-night.png" alt="Dunder Mifflin — Night" width="48%">
+</p>
+
+**What changes when you toggle it on**
+- 22 cast members (Michael, Jim, Pam, Dwight, Kevin, Angela, Stanley, Creed — the whole office) dealt to agent roles
+- Role chatter swaps to in-character lines (`"Bears. Beets. Battlestar Galactica."`, `"selling paper"`, `"Schrute bucks awarded"`)
+- Michael occasionally lands his signature `"That's what she said 😏"` when replying to finished work
+- Character prop overlays — Michael gets the Golden Ticket, Jim gets the jello stapler, Dwight gets the CPR dummy mask, Stanley gets a pretzel
+- Angela gets a follower cat *and* a head-cat (randomized from 12 cat sprites)
+- Kevin's chili, pretzel day, and Finer Things Club references sprinkled through the break-room chatter
+
+<p>
+  <img src="docs/images/michael-scott.png" alt="Michael Scott" height="140">
+  <img src="docs/images/jim-halpert.png" alt="Jim Halpert" height="140">
+  <img src="docs/images/dwight-schrute.png" alt="Dwight Schrute" height="140">
+  <img src="docs/images/prop-golden-ticket.png" alt="Golden Ticket" height="140">
+  <img src="docs/images/prop-jello-stapler.png" alt="Jello Stapler" height="140">
+  <img src="docs/images/prop-cpr-mask.png" alt="CPR Dummy Mask" height="140">
+</p>
+
+Toggle it off any time with `/the-office` again — state persists in `localStorage`.
+
+---
+
 ### Full office — agents working, chatting, and taking coffee breaks
 ![Day Mode](docs/images/Day-Mode.png)
 
@@ -67,7 +98,13 @@ bash scripts/stop-office.sh
 
 Open `http://localhost:3333` — the office is ready.
 
-To connect Claude Code, add the hook to `~/.claude/settings.json`:
+### Auto-Permissions
+
+The repo includes `.claude/settings.json` which auto-allows curl commands to the local office server (`127.0.0.1:3334`) and the start/stop scripts. This means the chat monitor cron and office commands run without permission prompts.
+
+### Connect Claude Code
+
+Add the hook to `~/.claude/settings.json`:
 
 ```json
 {
@@ -105,7 +142,7 @@ The boss character (you) is configurable via `office.config.json`:
 
 ### Creating a custom sprite
 
-Use the Helper sprite sheet as a reference for the 4-direction layout:
+Use the Helper sprite sheet as a reference for the 4-direction layout — here's an example of mine next to it:
 
 <p>
   <img src="docs/images/Helper.png" alt="Helper Sprite Template" height="250">
@@ -113,7 +150,7 @@ Use the Helper sprite sheet as a reference for the 4-direction layout:
   <img src="docs/images/Me-1-rear-left.png" alt="Custom Boss — Rear Left" height="250">
 </p>
 
-Here's Mini Claude — generated from the same template using the prompt below:
+Here's Mini Claude — I asked Claude to describe itself after showing it the office with my avatar, then used the prompt to generate the sprite:
 
 <img src="docs/images/mini-claude.png" alt="Mini Claude" height="500">
 

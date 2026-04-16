@@ -4,6 +4,7 @@ import SpeechBubble from './SpeechBubble'
 import EffectBubble from './EffectBubble'
 import { getEffect } from '../agentManager'
 import { ROLE_TO_CHAR } from '../config'
+import { getSpritePath, useTheme } from '../theme'
 
 export { ROLE_TO_CHAR }
 
@@ -122,11 +123,13 @@ const Character: React.FC<CharacterProps> = ({ agent, idleDurationMs = 0, zIndex
 
   const animState = getAnimState(agent.state)
   const charBase = getCharBase(agent.role)
-  const spriteSrc = `/sprites/characters/${charBase}-${directionRef.current}.png`
+  const theme = useTheme() // Why: re-render on theme toggle so sprite path updates
+  const spriteSrc = getSpritePath(agent.id, agent.role, charBase, directionRef.current)
+  void theme
 
   const effectSrc = isTyping
     ? '/sprites/effects/typing.png'
-    : getEffect(agent.state, idleDurationMs, agent.statusText, agent.id, agent.task)
+    : getEffect(agent.state, idleDurationMs, agent.statusText, agent.id, agent.task, agent.role)
 
   return (
     <div

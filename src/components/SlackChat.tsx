@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { ROLE_TO_CHAR } from '../config'
+import { getSpritePath, useTheme, toggleTheme, getTheme, themedDisplayName } from '../theme'
 
-function getAvatarSrc(role: string): string {
+function getAvatarSrc(role: string, agentId?: string): string {
   const charBase = ROLE_TO_CHAR[role] ?? 'employee-3'
-  return `/sprites/characters/${charBase}-front-right.png`
+  // Why: avatars in chat use agent.id when available so Office casting stays consistent
+  return getSpritePath(agentId ?? `role-${role}`, role, charBase, 'front-right')
 }
 
 // Proactive message detection: agent announcements about starting/completing work
@@ -21,6 +23,8 @@ export interface ChatMessage {
   reactions?: string[]
 }
 
+const EMOJI_PICKER = ['👍', '👎', '😊', '🎉', '😡', '🔥', '💯']
+
 interface SlackChatProps {
   messages: ChatMessage[]
   muted: boolean
@@ -28,6 +32,7 @@ interface SlackChatProps {
   onToggleMute: () => void
   onVolumeChange: (v: number) => void
   onSendMessage?: (text: string) => void
+  onReaction?: (messageId: number, reactions: string[]) => void
   /** For video mode: auto-type text into the input box */
   autoTypeText?: string
   dayPhase: string
@@ -37,12 +42,37 @@ interface SlackChatProps {
   lastSeenId?: number | null
 }
 
-const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggleMute, onVolumeChange, onSendMessage, autoTypeText, dayPhase, typingUser, lastSeenId }) => {
+const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggleMute, onVolumeChange, onSendMessage, onReaction, autoTypeText, dayPhase, typingUser, lastSeenId }) => {
+  const theme = useTheme()
+  void theme // Why: subscribe so avatars re-render when /the-office toggles
   const bodyRef = useRef<HTMLDivElement>(null)
   const [inputText, setInputText] = useState('')
   const [showSlashHint, setShowSlashHint] = useState(false)
+  const [emojiPickerMsgId, setEmojiPickerMsgId] = useState<number | null>(null)
+  const pickerRef = useRef<HTMLDivElement>(null)
   const onSendRef = useRef(onSendMessage)
   onSendRef.current = onSendMessage
+
+  // Close emoji picker on click outside
+  useEffect(() => {
+    if (emojiPickerMsgId === null) return
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setEmojiPickerMsgId(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [emojiPickerMsgId])
+
+  const handleReaction = useCallback((msg: ChatMessage, emoji: string) => {
+    const existing = msg.reactions || []
+    const updated = existing.includes(emoji)
+      ? existing.filter(r => r !== emoji)
+      : [...existing, emoji]
+    onReaction?.(msg.id, updated)
+    setEmojiPickerMsgId(null)
+  }, [onReaction])
 
   // Cron/chat-monitor pause toggle
   const [cronPaused, setCronPaused] = useState(false)
@@ -137,7 +167,10 @@ const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggle
           const isProactive = !msg.isSystem && PROACTIVE_PATTERN.test(msg.text)
           return (
             <React.Fragment key={msg.id}>
-              <div className={`slack-msg${msg.isSystem ? ' slack-msg-system' : ''}${isProactive ? ' slack-msg-proactive' : ''}`}>
+              <div
+                className={`slack-msg${msg.isSystem ? ' slack-msg-system' : ''}${isProactive ? ' slack-msg-proactive' : ''}`}
+                onDoubleClick={() => !msg.isSystem && setEmojiPickerMsgId(prev => prev === msg.id ? null : msg.id)}
+              >
                 {!msg.isSystem && (
                   <div className="slack-avatar" style={{ border: `2px solid ${msg.senderColor}`, boxShadow: `0 0 6px ${msg.senderColor}40` }}>
                     <img
@@ -158,7 +191,7 @@ const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggle
                   {!msg.isSystem && (
                     <div className="slack-msg-header">
                       <span className="slack-sender" style={{ color: msg.senderColor }}>
-                        {msg.sender}
+                        {themedDisplayName(msg.senderSprite, msg.sender)}
                       </span>
                       <span className="slack-time">{msg.timestamp}</span>
                     </div>
@@ -169,7 +202,23 @@ const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggle
                   {msg.reactions && msg.reactions.length > 0 && (
                     <div className="slack-reactions">
                       {msg.reactions.map((r, i) => (
-                        <span key={i} className="slack-reaction">{r}</span>
+                        <span
+                          key={i}
+                          className="slack-reaction"
+                          onClick={() => handleReaction(msg, r)}
+                          title="Click to remove"
+                        >{r}</span>
+                      ))}
+                    </div>
+                  )}
+                  {emojiPickerMsgId === msg.id && (
+                    <div className="slack-emoji-picker" ref={pickerRef}>
+                      {EMOJI_PICKER.map(emoji => (
+                        <button
+                          key={emoji}
+                          className={`slack-emoji-btn${msg.reactions?.includes(emoji) ? ' active' : ''}`}
+                          onClick={() => handleReaction(msg, emoji)}
+                        >{emoji}</button>
                       ))}
                     </div>
                   )}
@@ -203,6 +252,7 @@ const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggle
             <span className="slack-slash-cmd">/status</span>
             <span className="slack-slash-cmd">/agents</span>
             <span className="slack-slash-cmd">/help</span>
+            <span className="slack-slash-cmd">/the-office</span>
           </div>
         )}
         <div className="slack-input-bar">
@@ -222,7 +272,15 @@ const SlackChat: React.FC<SlackChatProps> = ({ messages, muted, volume, onToggle
                 return
               }
               if (e.key === 'Enter' && inputText.trim()) {
-                onSendMessage?.(inputText.trim())
+                const trimmed = inputText.trim()
+                // Client-side slash commands — not sent to backend
+                if (trimmed === '/the-office' || trimmed === '/theoffice') {
+                  toggleTheme()
+                  const nowOn = getTheme() === 'office'
+                  onSendMessage?.(nowOn ? '🧻 Dunder Mifflin mode: ON. Identity theft is not a joke.' : '🔁 Office theme: OFF')
+                } else {
+                  onSendMessage?.(trimmed)
+                }
                 setInputText('')
                 setShowSlashHint(false)
               }

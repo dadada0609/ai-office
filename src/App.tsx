@@ -27,6 +27,11 @@ import {
 import { BOSS_ROLE, BOSS_NAME } from './config'
 import { pickEvent } from './events'
 import { getInteraction } from './interactions'
+import {
+  useTheme, getRoomImage, getAngelaCat, getTheme,
+  OFFICE_SIM_TOOL_MESSAGES, OFFICE_SIM_BOSS_PROMPTS,
+  assignCharacterToRole, releaseRole, nextUnusedOfficeCharacter, displayNameFromSlug,
+} from './theme'
 
 // ---------------------------------------------------------------------------
 // Placement helper — loaded via ?helper query param
@@ -36,6 +41,9 @@ const params = new URLSearchParams(window.location.search)
 const isHelperMode = params.has('helper')
 const isSimMode = params.has('sim') || params.has('video')
 const isVideoMode = params.has('video')
+// Why: allow ?theme=office on demo/sim URLs to preload Dunder Mifflin mode
+import { setTheme as _setTheme } from './theme'
+if (params.get('theme') === 'office') { _setTheme('office') }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -244,8 +252,37 @@ const SIM_CHATTER = [
   { sender: 'Antony', role: 'boss', msg: 'how are we looking on the dashboard?' },
 ]
 
+// Dunder Mifflin themed chatter — used when /the-office is active
+const OFFICE_SIM_CHATTER = [
+  { sender: 'Debugger', role: 'debugger', msg: 'found a bug in the system — Creed. again.' },
+  { sender: 'Frontend', role: 'frontend-developer', msg: 'new catalog brochure looks cleaner than Dwight\'s desk' },
+  { sender: 'Security', role: 'security-auditor', msg: 'heads up — Dwight is conducting another surprise fire drill' },
+  { sender: 'Reviewer', role: 'code-reviewer', msg: 'the ream count checks out. approved.' },
+  { sender: 'DBA', role: 'database-architect', msg: 'indexed the client list alphabetically. like the old days.' },
+  { sender: 'DevOps', role: 'devops-engineer', msg: 'loading the delivery truck — Schrute beet vans.' },
+  { sender: 'Claude', role: 'assistant', msg: 'Michael is in the conference room. again. please help.' },
+  { sender: 'Tester', role: 'test-engineer', msg: 'tested the paper quality. still paper. 94% paper.' },
+  { sender: 'PerfEng', role: 'performance-engineer', msg: 'the printer warms up 200ms faster. small wins.' },
+  { sender: 'Frontend', role: 'frontend-developer', msg: 'mobile layout works — even Creed noticed' },
+  { sender: 'Claude', role: 'assistant', msg: 'someone get the printer, it\'s on fire. literal fire.' },
+  { sender: 'Architect', role: 'architect-reviewer', msg: 'the Finer Things Club charter is immaculate' },
+  { sender: 'AI Eng', role: 'ai-engineer', msg: 'teaching the copier to recognize Stanley\'s handwriting' },
+  { sender: 'TS Pro', role: 'typescript-pro', msg: 'false. that is not a staple. it is a Dwight.' },
+  { sender: 'Antony', role: 'boss', msg: "anyone want to go to Chili's? I got Baby Back Ribs on the brain." },
+  { sender: 'Antony', role: 'boss', msg: 'ship it. we\'ll fix it in prod. PARKOUR!' },
+  { sender: 'Antony', role: 'boss', msg: 'how many reams did we move today?' },
+  { sender: 'Antony', role: 'boss', msg: "I'm not superstitious, but I am a little stitious." },
+  { sender: 'Debugger', role: 'debugger', msg: 'Bears. Beets. Battlestar Galactica.' },
+  { sender: 'Security', role: 'security-auditor', msg: 'Identity theft is not a joke, Jim! Millions of families suffer every year!' },
+  { sender: 'Reviewer', role: 'code-reviewer', msg: "that's what she said" },
+  { sender: 'Frontend', role: 'frontend-developer', msg: 'I feel God in this Chili\'s tonight' },
+  { sender: 'Tester', role: 'test-engineer', msg: 'Would I rather be feared or loved? Easy. Both.' },
+  { sender: 'DevOps', role: 'devops-engineer', msg: 'I declare BANKRUPTCY' },
+]
+
 const App: React.FC = () => {
   // All hooks must be at the top — before any conditional returns.
+  const theme = useTheme() // Why: re-render rooms + agents when /the-office toggles
   const [agents, setAgents] = useState<Agent[]>(() => [createBoss(), createClaude()])
   const agentMetaRef = useRef<Map<string, AgentMeta>>(new Map([
     [BOSS_ID, { spawnedAt: Date.now(), arrivedAtDeskAt: Date.now(), idleSince: null, onBreak: false, breakStartedAt: null }],
@@ -657,7 +694,11 @@ const App: React.FC = () => {
               `cheers ${a.name}`,
               `merged. next task loading...`,
             ]
-            const reply = bossReplies[Math.floor(Math.random() * bossReplies.length)]
+            // Why: when Office theme is on, Michael Scott occasionally lands his signature line.
+            const isMichael = getTheme() === 'office'
+            const reply = isMichael && Math.random() < 0.25
+              ? `That's what she said 😏`
+              : bossReplies[Math.floor(Math.random() * bossReplies.length)]
             effects.push({
               msg: { sender: bossCfg.title, role: BOSS_ROLE, color: bossCfg.color, text: reply },
             })
@@ -812,6 +853,94 @@ const App: React.FC = () => {
     const timers: ReturnType<typeof setTimeout>[] = []
     const intervals: ReturnType<typeof setInterval>[] = []
 
+    // ---- Office-theme rotation sim: 10 staff, constant door churn, cycles all 22 ----
+    if (getTheme() === 'office' && !isVideoMode) {
+      // Why: roles are synthetic "dm-0..dm-9" so each slot gets its own cast entry
+      const STAFF_COUNT = 10
+      const ROTATION_MS = 9000 // Why: fast enough to see all 22 in <2 min
+      const ROLES = ['debugger', 'code-reviewer', 'frontend-developer', 'fullstack-developer',
+                      'test-engineer', 'security-auditor', 'devops-engineer',
+                      'architect-reviewer', 'performance-engineer', 'ai-engineer'] as const
+      let lastRetired: string | null = null
+
+      const spawnSlot = (slotIdx: number, initialDelay = 0) => {
+        const role = `dm-slot-${slotIdx}`
+        const baseRole = ROLES[slotIdx % ROLES.length]
+        const cfg = AGENT_CONFIGS[baseRole] ?? AGENT_CONFIGS['default']
+        const slug = nextUnusedOfficeCharacter(new Set(lastRetired ? [lastRetired] : []))
+        const displayName = displayNameFromSlug(slug)
+
+        timers.push(setTimeout(() => {
+          // Why: force this synthetic role to map to the chosen Office character
+          assignCharacterToRole(role, slug)
+          handleEvent({
+            type: 'agent_spawned',
+            agent: {
+              id: `dm-${slotIdx}-${Date.now()}`,
+              name: displayName,
+              role, // synthetic — so castByRole maps uniquely
+              task: `Dunder Mifflin — ${displayName}`,
+            },
+          })
+          timers.push(setTimeout(() => {
+            addMsg(displayName, role, cfg.color, `clocked in — ${displayName} reporting`)
+          }, 1000))
+        }, initialDelay))
+      }
+
+      // Spawn 10 staff staggered over first 8s
+      for (let i = 0; i < STAFF_COUNT; i++) {
+        spawnSlot(i, i * 800)
+      }
+
+      // Rotation: every ROTATION_MS, retire oldest agent, spawn a new one in its slot
+      let nextSlotToRotate = 0
+      intervals.push(setInterval(() => {
+        const slotIdx = nextSlotToRotate % STAFF_COUNT
+        nextSlotToRotate++
+        const role = `dm-slot-${slotIdx}`
+
+        // Find the current agent for this slot and complete it (walks to door, exits)
+        setAgents(prev => {
+          const agent = prev.find(a => a.role === role)
+          if (agent) {
+            lastRetired = null // will be set after release
+            handleEvent({
+              type: 'agent_completed',
+              agentId: agent.id,
+              result: `${agent.name} heading out for a pretzel`,
+            })
+          }
+          return prev
+        })
+
+        // After the exit animation, release the cast slot and spawn replacement
+        timers.push(setTimeout(() => {
+          releaseRole(role)
+          spawnSlot(slotIdx, 800) // small gap before new hire walks in
+        }, 3500))
+      }, ROTATION_MS))
+
+      // Periodic Office chatter from random staff
+      intervals.push(setInterval(() => {
+        setAgents(prev => {
+          const staff = prev.filter(a => a.role.startsWith('dm-slot-'))
+          if (staff.length === 0) return prev
+          const speaker = staff[Math.floor(Math.random() * staff.length)]
+          const lines = OFFICE_SIM_TOOL_MESSAGES[ROLES[parseInt(speaker.role.split('-')[2], 10) % ROLES.length]] ?? []
+          const line = lines[Math.floor(Math.random() * lines.length)] ?? 'selling paper'
+          const cfg = AGENT_CONFIGS[ROLES[0]] ?? AGENT_CONFIGS['default']
+          addMsg(speaker.name, speaker.role, cfg.color, line)
+          return prev
+        })
+      }, 4500))
+
+      return () => {
+        timers.forEach(t => clearTimeout(t))
+        intervals.forEach(i => clearInterval(i))
+      }
+    }
+
     // Helper: post a message with an optional typing indicator beforehand.
     // showTyping=true will set a typing state for ~1.5s before the message appears.
     const postWithTyping = (
@@ -926,10 +1055,12 @@ const App: React.FC = () => {
     timers.push(setTimeout(() => {
       let chatterIdx = 0
       const chatterInterval = setInterval(() => {
-        if (chatterIdx >= SIM_CHATTER.length) {
+        // Why: pool chosen at fire time so /the-office toggle mid-sim swaps the chatter instantly
+        const pool = getTheme() === 'office' ? OFFICE_SIM_CHATTER : SIM_CHATTER
+        if (chatterIdx >= pool.length) {
           chatterIdx = 0 // loop
         }
-        const chat = SIM_CHATTER[chatterIdx]
+        const chat = pool[chatterIdx]
         const showTyping = chatterIdx % 3 === 0
         postWithTyping(chat.sender, chat.role, chat.msg, 0, showTyping)
 
@@ -1016,14 +1147,19 @@ const App: React.FC = () => {
     const timers: ReturnType<typeof setTimeout>[] = []
     const bossCfg = AGENT_CONFIGS[BOSS_ROLE] ?? AGENT_CONFIGS['default']
 
+    const officeSim0 = getTheme() === 'office'
+
     // 0-3s: Office is just Antony, settling in
     timers.push(setTimeout(() => {
-      addMsg(bossCfg.title, BOSS_ROLE, bossCfg.color, '👑 clocked in, lets get to work')
+      addMsg(bossCfg.title, BOSS_ROLE, bossCfg.color,
+        officeSim0 ? "👑 World's Best Boss clocked in, let's sell some paper" : '👑 clocked in, lets get to work')
     }, 2000))
 
     // 4s: Antony types a question in Slack
     timers.push(setTimeout(() => {
-      setAutoTypeText('/ultra-think audit our authentication system for security vulnerabilities')
+      setAutoTypeText(officeSim0
+        ? (OFFICE_SIM_BOSS_PROMPTS[0] ?? '/ultra-think audit our authentication system for security vulnerabilities')
+        : '/ultra-think audit our authentication system for security vulnerabilities')
     }, 4000))
 
     // 8s: 3 agents spawn with ultra-think tasks (energy drinks!)
@@ -1040,8 +1176,10 @@ const App: React.FC = () => {
       })
     }, 8000))
 
-    // 16s: Realistic tool output messages in Slack
-    const toolMessages = [
+    // 16s: Realistic tool output messages in Slack.
+    // Why: swap to Office-themed chatter when /the-office mode is on at sim start
+    const isOfficeSim = getTheme() === 'office'
+    const defaultToolMessages = [
       { t: 16000, sender: 'Security', role: 'security-auditor', text: '⚡ reading src/auth/middleware.ts' },
       { t: 18000, sender: 'Reviewer', role: 'code-reviewer', text: '⚡ running: grep -r "jwt" src/' },
       { t: 20000, sender: 'Security', role: 'security-auditor', text: '⚠️ session tokens stored in localStorage — XSS risk' },
@@ -1051,6 +1189,12 @@ const App: React.FC = () => {
       { t: 28000, sender: 'Frontend', role: 'frontend-developer', text: '⚡ editing src/auth/tokenStore.ts' },
       { t: 30000, sender: 'Reviewer', role: 'code-reviewer', text: '💡 suggesting httpOnly cookies instead of localStorage' },
     ]
+    const toolMessages = isOfficeSim
+      ? defaultToolMessages.map((m, i) => {
+          const pool = OFFICE_SIM_TOOL_MESSAGES[m.role] ?? []
+          return { ...m, text: pool[i % pool.length] ?? m.text }
+        })
+      : defaultToolMessages
     toolMessages.forEach(({ t, sender, role, text }) => {
       timers.push(setTimeout(() => {
         const cfg = AGENT_CONFIGS[role] ?? AGENT_CONFIGS['default']
@@ -1060,24 +1204,29 @@ const App: React.FC = () => {
 
     // 25s: Antony types a follow-up
     timers.push(setTimeout(() => {
-      setAutoTypeText('how bad is the localStorage issue?')
+      setAutoTypeText(isOfficeSim ? (OFFICE_SIM_BOSS_PROMPTS[1] ?? 'how bad is the localStorage issue?') : 'how bad is the localStorage issue?')
     }, 25000))
 
     // 27s: Agent replies
     timers.push(setTimeout(() => {
       const cfg = AGENT_CONFIGS['security-auditor'] ?? AGENT_CONFIGS['default']
-      addMsg('Security', 'security-auditor', cfg.color, 'critical — any XSS gives full account takeover. moving to httpOnly cookies now')
+      addMsg('Security', 'security-auditor', cfg.color,
+        isOfficeSim
+          ? 'critical — Dwight-level bad. any XSS gives full account takeover. moving to httpOnly cookies now'
+          : 'critical — any XSS gives full account takeover. moving to httpOnly cookies now')
     }, 27500))
 
     // 30s: Random chatter
     timers.push(setTimeout(() => {
       const cfg = AGENT_CONFIGS['frontend-developer'] ?? AGENT_CONFIGS['default']
-      addMsg('Frontend', 'frontend-developer', cfg.color, 'I can handle the cookie migration on the client side')
+      addMsg('Frontend', 'frontend-developer', cfg.color,
+        isOfficeSim ? 'I can handle the cookie migration — easier than organizing the Dundies' : 'I can handle the cookie migration on the client side')
     }, 30000))
 
     timers.push(setTimeout(() => {
       const cfg = AGENT_CONFIGS['code-reviewer'] ?? AGENT_CONFIGS['default']
-      addMsg('Reviewer', 'code-reviewer', cfg.color, 'lgtm on the approach, lets ship it')
+      addMsg('Reviewer', 'code-reviewer', cfg.color,
+        isOfficeSim ? 'lgtm. ship it to Stamford, boom. roasted.' : 'lgtm on the approach, lets ship it')
     }, 32000))
 
     // 33s: Antony checks status with a slash command
@@ -1095,8 +1244,10 @@ const App: React.FC = () => {
 
     // 38s: Pizza delivery event!
     timers.push(setTimeout(() => {
-      addMsg('system', 'default', '#8b8d91', '🍕 Pizza has arrived! Free lunch!', true)
-      addMsg(bossCfg.title, BOSS_ROLE, bossCfg.color, 'Pizza in the lobby!')
+      addMsg('system', 'default', '#8b8d91',
+        officeSim0 ? '🥨 IT\'S PRETZEL DAY' : '🍕 Pizza has arrived! Free lunch!', true)
+      addMsg(bossCfg.title, BOSS_ROLE, bossCfg.color,
+        officeSim0 ? "You don't understand. It's pretzel day." : 'Pizza in the lobby!')
       // Move all agents to door
       setAgents(prev => prev.map(a => ({
         ...a,
@@ -1117,15 +1268,17 @@ const App: React.FC = () => {
       }, 5000))
     }, 38000))
 
-    // 45s: Agent chatter after pizza
+    // 45s: Agent chatter after pizza/pretzels
     timers.push(setTimeout(() => {
       const cfg = AGENT_CONFIGS['security-auditor'] ?? AGENT_CONFIGS['default']
-      addMsg('Security', 'security-auditor', cfg.color, 'pineapple on pizza is a security vulnerability')
+      addMsg('Security', 'security-auditor', cfg.color,
+        officeSim0 ? 'all the toppings. Stanley has been waiting all year.' : 'pineapple on pizza is a security vulnerability')
     }, 46000))
 
     timers.push(setTimeout(() => {
       const cfg = AGENT_CONFIGS['frontend-developer'] ?? AGENT_CONFIGS['default']
-      addMsg('Frontend', 'frontend-developer', cfg.color, '😂')
+      addMsg('Frontend', 'frontend-developer', cfg.color,
+        officeSim0 ? "that's what she said" : '😂')
     }, 47500))
 
     // 48s: Security completes
@@ -1133,7 +1286,9 @@ const App: React.FC = () => {
       handleEvent({
         type: 'agent_completed',
         agentId: 'vid-security',
-        result: 'Auth audit complete — 3 critical issues fixed, 2 PRs merged',
+        result: officeSim0
+          ? 'Audit complete — beets secured. 3 critical issues booked into the Schrute Manual.'
+          : 'Auth audit complete — 3 critical issues fixed, 2 PRs merged',
       })
     }, 48000))
 
@@ -1142,22 +1297,24 @@ const App: React.FC = () => {
       handleEvent({
         type: 'agent_completed',
         agentId: 'vid-explore',
-        result: 'Found 8 auth-related files, all updated',
+        result: officeSim0 ? 'Found 8 auth files — all filed under B for "Beet".' : 'Found 8 auth-related files, all updated',
       })
     }, 52000))
 
     // 55s: Antony wraps up
     timers.push(setTimeout(() => {
-      setAutoTypeText('great work team, ship it! 🚀')
+      setAutoTypeText(officeSim0 ? 'great work team — boom. roasted. 🥨' : 'great work team, ship it! 🚀')
     }, 55000))
 
     // 58s: Remaining agents complete
     timers.push(setTimeout(() => {
-      handleEvent({ type: 'agent_completed', agentId: 'vid-reviewer', result: 'All PRs reviewed and approved' })
+      handleEvent({ type: 'agent_completed', agentId: 'vid-reviewer',
+        result: officeSim0 ? 'All PRs reviewed — Jim-approved.' : 'All PRs reviewed and approved' })
     }, 58000))
 
     timers.push(setTimeout(() => {
-      handleEvent({ type: 'agent_completed', agentId: 'vid-frontend', result: 'Cookie migration deployed to staging' })
+      handleEvent({ type: 'agent_completed', agentId: 'vid-frontend',
+        result: officeSim0 ? 'Cookies deployed — Kevin took half for his chili.' : 'Cookie migration deployed to staging' })
     }, 60000))
 
     return () => timers.forEach(t => clearTimeout(t))
@@ -1635,15 +1792,17 @@ const App: React.FC = () => {
             position: 'relative',
           }}
         >
-          {/* Room backgrounds — both rendered, night crossfades via opacity */}
+          {/* Room backgrounds — both rendered, night crossfades via opacity. Theme swaps source art. */}
           <div
+            key={`day-${theme}`}
             className="room-background"
-            style={{ backgroundImage: 'url(/rooms/office-day.png)' }}
+            style={{ backgroundImage: `url(${getRoomImage('day')})` }}
           />
           <div
+            key={`night-${theme}`}
             className="room-background room-background-night"
             style={{
-              backgroundImage: 'url(/rooms/office-night.png)',
+              backgroundImage: `url(${getRoomImage('night')})`,
               opacity: dayNightMode === 'auto' ? nightOpacity : dayNightMode === 'night' ? 1 : 0,
             }}
           />
@@ -1689,6 +1848,34 @@ const App: React.FC = () => {
               />
             )
           })}
+
+          {/* Angela's cat — follows whoever is cast as Angela in Office theme */}
+          {(() => {
+            const angela = getAngelaCat()
+            if (!angela) return null
+            const host = agents.find(a => a.role === angela.role)
+            if (!host) return null
+            return (
+              <img
+                src={angela.catSprite}
+                alt="cat"
+                className="angela-cat"
+                style={{
+                  position: 'absolute',
+                  left: `${host.position.x + 2.2}%`,
+                  top: `${host.position.y}%`,
+                  // Why: cats are 30-40% of ~78px character = ~24-30px tall
+                  height: 28,
+                  width: 'auto',
+                  transform: 'translate(-50%, -10%)',
+                  zIndex: Math.round(host.position.y) + 1,
+                  pointerEvents: 'none',
+                  filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.4))',
+                }}
+                draggable={false}
+              />
+            )
+          })()}
 
           {/* Boss interaction effect */}
           {bossEffect && (() => {
@@ -1741,6 +1928,11 @@ const App: React.FC = () => {
         dayPhase={effectivePhase}
         typingUser={chatTypingUser}
         lastSeenId={lastSeenId}
+        onReaction={(messageId, reactions) => {
+          setMessages(prev => prev.map(m =>
+            m.id === messageId ? { ...m, reactions } : m
+          ))
+        }}
       />
       </div>
     </div>

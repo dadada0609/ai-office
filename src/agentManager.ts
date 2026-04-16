@@ -26,6 +26,7 @@
 
 import { Agent, AgentState, Position } from './types'
 import { AgentSpot, Waypoint } from './rooms'
+import { themedSpawn, themedWork, themedDone, themedCoffee, themedWater, getOfficePropForRole } from './theme'
 
 // ---------------------------------------------------------------------------
 // Spot assignment
@@ -229,7 +230,15 @@ export function getEffect(
   statusText?: string,
   agentId?: string,
   task?: string,
+  role?: string,
 ): string | null {
+  // Office theme: prop overlays replace energy drinks for mapped cast members.
+  // Why: Dwight → CPR mask, Michael → Golden Ticket, etc. Still gated to "working" + break states.
+  const officeProp = role ? getOfficePropForRole(role) : null
+  if (officeProp && (state === 'working' || state === 'coffee-break')) {
+    return officeProp
+  }
+
   // Boss gets Red Bull instead of coffee
   if (agentId?.startsWith('boss-') && state === 'coffee-break') {
     return '/sprites/effects/redbull-energy.png'
@@ -328,11 +337,14 @@ const WATER_MESSAGES = [
   'quick water break',
 ]
 
-export function spawnMessage(): string  { return pick(SPAWN_MESSAGES) }
-export function workMessage(): string   { return pick(WORK_MESSAGES) }
-export function doneMessage(): string   { return pick(DONE_MESSAGES) }
-export function coffeeMessage(): string { return pick(COFFEE_MESSAGES) }
-export function waterMessage(): string  { return pick(WATER_MESSAGES) }
+// Why: route through theme module so Office mode swaps chatter automatically.
+// Fallback pool kept for reference but theme module carries default strings too.
+void SPAWN_MESSAGES; void WORK_MESSAGES; void DONE_MESSAGES; void COFFEE_MESSAGES; void WATER_MESSAGES
+export function spawnMessage(): string  { return themedSpawn() }
+export function workMessage(): string   { return themedWork() }
+export function doneMessage(): string   { return themedDone() }
+export function coffeeMessage(): string { return themedCoffee() }
+export function waterMessage(): string  { return themedWater() }
 
 // ---------------------------------------------------------------------------
 // Break scheduling
