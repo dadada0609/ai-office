@@ -20,13 +20,35 @@ Type `/the-office` in the Slack chat panel to flip the whole office into a Scran
 - Angela gets a follower cat *and* a head-cat (randomized from 12 cat sprites)
 - Kevin's chili, pretzel day, and Finer Things Club references sprinkled through the break-room chatter
 
-<p>
-  <img src="docs/images/michael-scott.png" alt="Michael Scott" height="140">
-  <img src="docs/images/jim-halpert.png" alt="Jim Halpert" height="140">
-  <img src="docs/images/dwight-schrute.png" alt="Dwight Schrute" height="140">
-  <img src="docs/images/prop-golden-ticket.png" alt="Golden Ticket" height="140">
-  <img src="docs/images/prop-jello-stapler.png" alt="Jello Stapler" height="140">
-  <img src="docs/images/prop-cpr-mask.png" alt="CPR Dummy Mask" height="140">
+### The cast
+<p align="center">
+  <img src="docs/images/michael-scott.png" alt="Michael Scott" height="150">
+  <img src="docs/images/jim-halpert.png" alt="Jim Halpert" height="150">
+  <img src="docs/images/pam-beesly.png" alt="Pam Beesly" height="150">
+  <img src="docs/images/dwight-schrute.png" alt="Dwight Schrute" height="150">
+  <img src="docs/images/angela-martin.png" alt="Angela Martin" height="150">
+  <img src="docs/images/kevin-malone.png" alt="Kevin Malone" height="150">
+  <img src="docs/images/stanley-hudson.png" alt="Stanley Hudson" height="150">
+  <img src="docs/images/andy-bernard.png" alt="Andy Bernard" height="150">
+  <img src="docs/images/kelly-kapoor.png" alt="Kelly Kapoor" height="150">
+  <img src="docs/images/ryan-howard.png" alt="Ryan Howard" height="150">
+</p>
+
+### Easter-egg props
+Each cast member gets a signature prop floating above their desk in place of the usual coffee/Red Bull bubble.
+
+<p align="center">
+  <img src="docs/images/prop-golden-ticket.png" alt="Golden Ticket (Michael)" height="70">
+  &nbsp;&nbsp;
+  <img src="docs/images/prop-jello-stapler.png" alt="Jello Stapler (Jim)" height="70">
+  &nbsp;&nbsp;
+  <img src="docs/images/prop-cpr-mask.png" alt="CPR Dummy Mask (Dwight)" height="70">
+  &nbsp;&nbsp;
+  <img src="docs/images/prop-pretzel.png" alt="Pretzel Day (Stanley)" height="70">
+  &nbsp;&nbsp;
+  <img src="docs/images/prop-dunder-logo.png" alt="Dunder Mifflin Logo" height="70">
+  &nbsp;&nbsp;
+  <img src="docs/images/prop-angela-cat.png" alt="Angela's cat" height="70">
 </p>
 
 Toggle it off any time with `/the-office` again — state persists in `localStorage`.
