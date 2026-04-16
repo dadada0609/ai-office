@@ -13,7 +13,7 @@ Type `/the-office` in the Slack chat panel to flip the whole office into a Scran
 </p>
 
 **What changes when you toggle it on**
-- 22 cast members (Michael, Jim, Pam, Dwight, Kevin, Angela, Stanley, Creed — the whole office) dealt to agent roles
+- 25 cast members (Michael, Jim, Pam, Dwight, Kevin, Angela, Stanley, Creed, Robert California — the whole office) dealt to agent roles
 - Role chatter swaps to in-character lines (`"Bears. Beets. Battlestar Galactica."`, `"selling paper"`, `"Schrute bucks awarded"`)
 - Michael occasionally lands his signature `"That's what she said 😏"` when replying to finished work
 - Character prop overlays — Michael gets the Golden Ticket, Jim gets the jello stapler, Dwight gets the CPR dummy mask, Stanley gets a pretzel
@@ -22,16 +22,18 @@ Type `/the-office` in the Slack chat panel to flip the whole office into a Scran
 
 ### The cast
 <p align="center">
-  <img src="docs/images/michael-scott.png" alt="Michael Scott" height="150">
-  <img src="docs/images/jim-halpert.png" alt="Jim Halpert" height="150">
-  <img src="docs/images/pam-beesly.png" alt="Pam Beesly" height="150">
-  <img src="docs/images/dwight-schrute.png" alt="Dwight Schrute" height="150">
-  <img src="docs/images/angela-martin.png" alt="Angela Martin" height="150">
-  <img src="docs/images/kevin-malone.png" alt="Kevin Malone" height="150">
-  <img src="docs/images/stanley-hudson.png" alt="Stanley Hudson" height="150">
-  <img src="docs/images/andy-bernard.png" alt="Andy Bernard" height="150">
-  <img src="docs/images/kelly-kapoor.png" alt="Kelly Kapoor" height="150">
-  <img src="docs/images/ryan-howard.png" alt="Ryan Howard" height="150">
+  <img src="docs/images/michael-scott.png" alt="Michael Scott" height="140">
+  <img src="docs/images/jim-halpert.png" alt="Jim Halpert" height="140">
+  <img src="docs/images/pam-beesly.png" alt="Pam Beesly" height="140">
+  <img src="docs/images/dwight-schrute.png" alt="Dwight Schrute" height="140">
+  <img src="docs/images/angela-martin.png" alt="Angela Martin" height="140">
+  <img src="docs/images/kevin-malone.png" alt="Kevin Malone" height="140">
+  <img src="docs/images/stanley-hudson.png" alt="Stanley Hudson" height="140">
+  <img src="docs/images/andy-bernard.png" alt="Andy Bernard" height="140">
+  <img src="docs/images/kelly-kapoor.png" alt="Kelly Kapoor" height="140">
+  <img src="docs/images/ryan-howard.png" alt="Ryan Howard" height="140">
+  <img src="docs/images/creed-bratton.png" alt="Creed Bratton" height="140">
+  <img src="docs/images/robert-california.png" alt="Robert California" height="140">
 </p>
 
 ### Easter-egg props
